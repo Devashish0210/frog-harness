@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GeminiSupervisoryExecutionReport",
+  "description": "Schema for structured execution reports consumed by Gemini/Antigravity for project supervision and replanning",
+  "type": "object",
+  "properties": {
+    "report_version": { "type": "string", "const": "1.0.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "run_id": { "type": "string" },
+    "project_name": { "type": "string" },
+    "git_branch": { "type": "string" },
+    "head_commit": { "type": "string" },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["COMPLETED", "PARTIAL", "BLOCKED", "FAILED"] },
+        "total_tasks": { "type": "integer", "minimum": 0 },
+        "completed_tasks": { "type": "integer", "minimum": 0 },
+        "blocked_tasks": { "type": "integer", "minimum": 0 },
+        "failed_tasks": { "type": "integer", "minimum": 0 },
+        "pending_tasks": { "type": "integer", "minimum": 0 },
+        "progress_percentage": { "type": "number", "minimum": 0, "maximum": 100 }
+      },
+      "required": ["status", "total_tasks", "completed_tasks", "blocked_tasks", "failed_tasks", "pending_tasks", "progress_percentage"]
+    },
+    "completed_task_checkpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string" },
+          "title": { "type": "string" },
+          "git_commit_hash": { "type": "string" },
+          "completed_at": { "type": "string", "format": "date-time" },
+          "attempts": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["task_id", "title", "git_commit_hash", "completed_at", "attempts"]
+      }
+    },
+    "blocked_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string" },
+          "title": { "type": "string" },
+          "reason": { "type": "string" },
+          "failed_attempts": { "type": "integer" },
+          "verification_errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "command": { "type": "string" },
+                "exit_code": { "type": "integer" },
+                "stderr_snippet": { "type": "string" }
+              },
+              "required": ["command", "exit_code"]
+            }
+          },
+          "cascaded_blocked_dependents": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["task_id", "title", "reason", "failed_attempts"]
+      }
+    },
+    "policy_violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string" },
+          "tool_name": { "type": "string" },
+          "denied_path_or_command": { "type": "string" },
+          "policy_rule": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["task_id", "tool_name", "policy_rule", "timestamp"]
+      }
+    },
+    "recommended_actions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": [
+    "report_version",
+    "generated_at",
+    "run_id",
+    "project_name",
+    "git_branch",
+    "summary",
+    "completed_task_checkpoints",
+    "blocked_tasks",
+    "recommended_actions"
+  ]
+}

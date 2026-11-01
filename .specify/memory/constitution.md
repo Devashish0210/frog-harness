@@ -1,120 +1,249 @@
 <!--
 # Sync Impact Report
-- Version change: Unratified (template) → 1.0.0
+- Version change: 1.0.0 → 2.0.0
 - List of modified principles:
-  - PRINCIPLE_1: [PRINCIPLE_1_NAME] → I. Deterministic Orchestration
-  - PRINCIPLE_2: [PRINCIPLE_2_NAME] → II. Test-First Development (NON-NEGOTIABLE)
-  - PRINCIPLE_3: [PRINCIPLE_3_NAME] → III. Bounded Autonomy & Explicit Safeguards
-  - PRINCIPLE_4: [PRINCIPLE_4_NAME] → IV. Security & Defensive Design
-  - PRINCIPLE_5: [PRINCIPLE_5_NAME] → V. Recoverability & State Resiliency
-  - Added PRINCIPLE_6: VI. Minimal Dependencies & Stdlib-First
-- Added sections:
-  - Core Principles (6 declarative, testable principles)
-  - Python Quality & Engineering Standards (SECTION_2)
-  - Development Workflow & Verification Gates (SECTION_3)
-  - Governance
+  - PRINCIPLE_1: I. Deterministic Orchestration → II. Deterministic Orchestration (re-mapped to programmatic control and dependency enforcement)
+  - PRINCIPLE_2: II. Test-First Development (NON-NEGOTIABLE) → VII. Test-Driven and Evidence-Based Development (expanded with independent verification, exit codes, and diff inspection)
+  - PRINCIPLE_3: III. Bounded Autonomy & Explicit Safeguards → III. Security by Default & VI. Immutable Task Scope (split into strict Tool Gateway containment and task scope boundaries)
+  - PRINCIPLE_4: IV. Security & Defensive Design → III. Security by Default & IV. Independent Authorization and Verification (separated into Policy Engine defense and independent verification)
+  - PRINCIPLE_5: V. Recoverability & State Resiliency → IX. Recoverability and State Persistence (explicitly mandates SQLite and Git reconciliation)
+  - PRINCIPLE_6: VI. Minimal Dependencies & Stdlib-First → XI. Simplicity and Maintainability (expanded with local Python app and avoidance of unnecessary microservices)
+- Added principles & sections:
+  - Core Engineering Principle preamble
+  - I. Separation of Intelligence and Execution
+  - V. Tool Execution Contracts
+  - VIII. Auditability and Traceability
+  - X. Resource Efficiency
+  - XII. Git Integrity
+  - XIII. Controlled Evolution
+  - SECTION_2: Architectural & Environmental Constraints
+  - SECTION_3: Verification Gates & Compliance Workflow
+  - Governance: Expanded role boundaries and non-negotiable primacy
 - Removed sections:
-  - None (scaffolded placeholder sections replaced with concrete definitions)
+  - None (previous preliminary standards synthesized into dedicated sections)
 - Follow-up TODOs:
-  - None (all core placeholders populated and ratified)
+  - None (all principles and operational constraints fully defined from consti.txt)
 -->
 
 # Frognano Harness Constitution
 
+> **Core Engineering Principle**:
+> Gemini plans. SpecKit structures. Python orchestrates. FrogNano implements. The Policy Engine authorizes. The Runtime executes. The Verification Engine verifies. The Audit Ledger remembers.
+> No component may silently assume another component's authority.
+
 ## Core Principles
 
-### I. Deterministic Orchestration
-All workflows, task pipelines, and orchestration loops MUST be modeled as explicit, deterministic state machines or directed execution graphs. Given identical initial state, inputs, and environment configurations, execution order and step transitions MUST produce identical, verifiable outcomes.
-- Orchestration components MUST NOT rely on ambient, global, or implicit mutable state.
-- State transitions MUST be serialized, monotonic, and recorded in a traceable execution journal.
-- Concurrency and asynchronous operations MUST define explicit timeouts, bounded worker pools, and deterministic joining/ordering strategies.
-- *Rationale*: Non-deterministic orchestration breeds flaky execution, untraceable race conditions, and debugging nightmares in automated harness environments.
+### I. Separation of Intelligence and Execution
+The system MUST maintain strict separation between planning, implementation, orchestration, authorization, and verification:
+- **Gemini/Antigravity** is the planning and supervisory intelligence.
+- **GitHub SpecKit** is the source of truth for specifications, plans, and atomic tasks.
+- **Python orchestrator** controls execution order, task state, and workflow transitions.
+- **FrogNano** is the local implementation agent.
+- **Tool Gateway** controls all interactions between the model and the operating environment.
+- **Policy Engine** authorizes or denies operations.
+- **Verification Engine** independently evaluates implementation results.
+- **Audit Ledger** maintains a traceable execution history.
+- *Non-negotiable*: No LLM may override deterministic workflow controls or security policies.
+- *Rationale*: Blurring execution, authorization, and planning boundaries allows autonomous agents to bypass safeguards, fabricate verification evidence, or self-authorize privileged access.
 
-### II. Test-First Development (NON-NEGOTIABLE)
-Test-Driven Development (TDD) is strictly mandatory across all modules, drivers, harness controllers, and utility components.
-- Implementation code MUST NOT be written until unit or contract tests specifying the expected behavior have been authored, peer-reviewed, and confirmed failing (Red).
-- The Red-Green-Refactor cycle MUST be strictly enforced: Red (failing test) → Green (minimal code to pass) → Refactor (clean up while tests stay green).
-- Tests MUST validate nominal behavior, boundary conditions, invalid inputs, and simulated fault injection (e.g., timeout, partial write, subprocess failure).
-- Automated test suites (`pytest`) MUST maintain 100% passing status on all active branches.
-- *Rationale*: Writing tests first forces crisp boundary specification, prevents over-engineering, and provides ironclad regression protection.
+### II. Deterministic Orchestration
+All workflow control MUST be implemented programmatically.
+The orchestrator MUST:
+- Maintain explicit task states.
+- Enforce task dependencies.
+- Prevent execution of incomplete dependencies.
+- Apply configurable retry limits.
+- Persist state across interruptions.
+- Support deterministic recovery.
+- Prevent duplicate execution of completed tasks.
+- Validate all state transitions.
+- *Non-negotiable*: LLMs MUST NOT independently determine workflow completion.
+- *Rationale*: Programmatic state machines prevent runaway recursion, duplicate executions, and unverified task completion claims.
 
-### III. Bounded Autonomy & Explicit Safeguards
-Autonomous operations, agentic steps, and harness-driven actions MUST operate within strictly bounded, pre-declared limits of authority and resource consumption.
-- Every autonomous or automated execution loop MUST declare hard operational ceilings: maximum iteration count, step timeout, memory limits, and retry thresholds.
-- Potentially destructive or high-impact operations (including file deletion, process termination, external network communication, and credential access) MUST be gated behind explicit authorization checks or simulation/dry-run verification.
-- Autonomous routines MUST NOT self-escalate privileges, dynamically broaden their operational scope, or mutate governance configs.
-- Execution MUST immediately halt and surface an actionable alert when any safeguard boundary is breached.
-- *Rationale*: Unbounded autonomy risks resource exhaustion, cascading failures, data loss, and uncontrolled side effects.
+### III. Security by Default
+All model-generated operations MUST pass through the Tool Gateway. Direct, unrestricted shell or filesystem access by the model is prohibited.
+The Policy Engine MUST enforce:
+- Project-root filesystem boundaries.
+- Task-specific read/write permissions.
+- Command execution restrictions.
+- Global security policies.
+- Risk classification.
+- Human approval requirements.
+- Secret and credential protection.
+- *Non-negotiable*: Default permissions MUST follow the principle of least privilege. Denied operations MUST NOT be executed. Human approval MUST be required for operations outside predefined autonomous permissions. Global security policies MUST take precedence over task-level permissions.
+- *Rationale*: Restricting access to validated tools and strictly enforcing policy rules prevents local environment compromise and unintended side effects.
 
-### IV. Security & Defensive Design
-Security is an intrinsic architectural constraint, not an afterthought. The system MUST adhere to the principle of least privilege and zero-trust boundary verification.
-- Hardcoded secrets, credentials, API keys, or tokens MUST NEVER be committed to source code or embedded in configuration files; all sensitive material MUST be injected via secure environment variables or vault abstractions.
-- All inputs crossing process, network, CLI, or module boundaries MUST be rigorously validated and sanitized against strict schemas before consumption.
-- Subprocess invocations MUST use structured argument lists (e.g., `subprocess.run(["cmd", "arg"])`) and MUST NEVER use shell evaluation (`shell=True`) with untrusted or variable input.
-- File system operations MUST enforce path sanitization to guard against path traversal vulnerabilities.
-- *Rationale*: Harnesses and execution drivers possess significant local system access; defensive programming guarantees safety against malicious payloads and accidental compromise.
+### IV. Independent Authorization and Verification
+Authorization and verification MUST be separate responsibilities:
+- Policy Engine determines whether an operation is permitted.
+- Execution Runtime performs authorized operations.
+- Verification Engine evaluates their actual effects.
+- Audit Ledger records all stages.
+- *Non-negotiable*: An LLM cannot authorize its own privileged operations. An LLM cannot declare its own implementation verified. Task completion MUST be based on independently collected evidence.
+- *Rationale*: Self-authorization and self-verification create circular trust that invalidates safety and correctness guarantees.
 
-### V. Recoverability & State Resiliency
-Systems and orchestration workflows MUST be designed for crash tolerance, graceful degradation, and lossless recoverability.
-- Long-running orchestrations MUST implement atomic checkpointing of execution state, enabling clean resumption from the latest valid checkpoint without restarting from scratch.
-- State mutations MUST be idempotent; re-executing a previously interrupted step MUST NOT corrupt system state or create duplicate artifacts.
-- Errors MUST be categorized into recoverable (transient) and fatal (terminal) failures, with explicit, bounded retry policies (exponential backoff with jitter) applied only to recoverable conditions.
-- System crashes or abnormal shutdowns MUST leave a diagnostic post-mortem log detailing the failure site, stack trace, and serialized state at time of death.
-- *Rationale*: Real-world harness environments suffer disconnections, process kills, and infrastructure disruptions; recoverability ensures operational continuity without manual intervention.
+### V. Tool Execution Contracts
+Every tool MUST have:
+- A unique identifier.
+- A strict input schema.
+- Explicit permissions.
+- Defined execution behavior.
+- Structured output.
+- Error handling.
+- Audit events.
+- *Non-negotiable*: Tool implementations MUST NOT bypass authorization. Tool calls MUST be validated before execution. The runtime MUST record actual executed arguments, execution status, and resulting artifacts.
+- *Rationale*: Explicit tool contracts ensure typed execution, predictable behavior, and complete accountability across all environment mutations.
 
-### VI. Minimal Dependencies & Stdlib-First
-The codebase MUST maintain a lean, deliberate dependency footprint, prioritizing Python's standard library for all standard system, file, text, and operational capabilities.
-- Standard library modules (`pathlib`, `json`, `dataclasses`, `logging`, `typing`, `subprocess`, `asyncio`, `argparse`, `hashlib`) MUST be preferred over third-party alternatives unless standard library solutions are demonstrably inadequate.
-- Every external dependency added to the project MUST be explicitly justified in terms of necessity, maintenance health, security track record, and license compatibility.
-- Transitive dependency bloat and heavy omnibus frameworks MUST be avoided.
-- Dependencies MUST be pinned with exact versions and cryptographic hashes in standard dependency lockfiles.
-- *Rationale*: Every external dependency increases vulnerability attack surface, introduces supply-chain risk, inflates installation overhead, and risks future version incompatibilities.
+### VI. Immutable Task Scope
+Every implementation task MUST have:
+- A defined objective.
+- Explicit requirements.
+- Acceptance criteria.
+- Relevant context.
+- Permitted file boundaries.
+- Verification requirements.
+- Dependencies.
+- *Non-negotiable*: FrogNano MUST NOT silently expand task scope. If implementation requires architectural changes or modifications outside its authorized boundaries, it MUST return a `BLOCKED` result. Only the planning agent may propose changes to specifications or task definitions.
+- *Rationale*: Bounded task definitions prevent uncontrolled codebase churn and preserve modular, incremental progress.
 
-## Python Quality & Engineering Standards
+### VII. Test-Driven and Evidence-Based Development
+Implementation MUST be accompanied by appropriate tests. The system MUST independently execute prescribed verification commands.
+- A successful model response is NOT evidence of successful implementation.
+- The system MUST capture test output.
+- The system MUST capture process exit codes.
+- The system MUST validate Git diffs.
+- The system MUST detect unauthorized modifications.
+- The system MUST preserve failed verification evidence.
+- The system MUST prevent unsuccessful tasks from being marked complete.
+- *Non-negotiable*: Tests MUST NOT be silently skipped to obtain a successful status.
+- *Rationale*: Only deterministic verification via test runners, exit codes, and diff inspection provides authentic proof of functionality.
 
-### 1. Language & Typing
-- Code MUST target modern Python (3.11+) and leverage modern language features (such as pattern matching, `ExceptionGroup`, and `typing.Self`).
-- Strict static type hinting is required for all function signatures, return values, and module interfaces; code MUST pass `mypy` or `pyright` in strict mode without errors or unchecked `Any` escapes.
-- Domain models and configuration objects MUST use immutable dataclasses (`@dataclass(frozen=True)`) or strongly typed schemas to guarantee data integrity.
+### VIII. Auditability and Traceability
+Every execution MUST be traceable.
+The Audit Ledger MUST record:
+- Execution run identifiers.
+- Task identifiers.
+- Model identity.
+- Tool requests.
+- Authorization decisions.
+- Human approvals.
+- Actual execution arguments.
+- Execution results.
+- Verification outcomes.
+- Git commit references.
+- Timestamps.
+- Failure information.
+- *Non-negotiable*: Audit events MUST be append-only at the application level. The system MUST support reconstruction of a task's execution history. Sensitive credentials MUST never be written into audit logs.
+- *Rationale*: Immutable audit logging provides complete post-mortem diagnostics, compliance verification, and execution replayability.
 
-### 2. Code Organization & Architecture
-- Code MUST follow SOLID principles, separation of concerns, and clean architectural boundaries (decoupling interface/CLI, domain logic, orchestration engine, and external adapters).
-- Functions MUST be small, single-purpose, and free of unexpected side effects.
-- Formatting and style MUST be enforced via automated tooling (`ruff` for formatting and linting), adhering to PEP 8 standards with zero tolerance for lint warnings in CI.
+### IX. Recoverability and State Persistence
+Execution state MUST survive:
+- Application termination.
+- Operating system restarts.
+- Inference server failures.
+- Interrupted model generation.
+- Tool execution failures.
+- Test failures.
+- *Non-negotiable*: SQLite MUST provide initial persistent state storage. Recovery MUST reconcile persisted execution state against the actual repository and Git history before resuming. The system MUST NOT assume that an interrupted operation had no side effects.
+- *Rationale*: Resilient persistence ensures that crashes, restarts, and model timeouts do not corrupt the working tree or duplicate side effects.
 
-### 3. Observability & Logging
-- Logging MUST utilize structured formatting with consistent context keys (timestamp, level, component, run_id, task_id).
-- Application logging MUST write to `stderr` or structured log files; standard output (`stdout`) is reserved for machine-readable output (e.g., JSON) in CLI interfaces.
-- Secrets, tokens, and sensitive personal information MUST NEVER appear in log entries.
+### X. Resource Efficiency
+The system MUST be designed for the target hardware:
+- NVIDIA RTX 4060 Laptop GPU, 8 GB VRAM.
+- 16 GB system RAM.
+- Windows 11.
+- Local llama.cpp inference.
+- *Non-negotiable*: The implementation MUST minimize unnecessary services, memory consumption, and context usage. The system MUST use task-specific context assembly rather than repeatedly sending entire project histories. Inference configuration MUST remain external and configurable.
+- *Rationale*: Running local models under tight memory and VRAM constraints requires aggressive context pruning and lean runtime footprints.
 
-## Development Workflow & Verification Gates
+### XI. Simplicity and Maintainability
+- Prefer:
+  - Python standard library where practical.
+  - SQLite for local persistence.
+  - Explicit interfaces between components.
+  - Small, independently testable modules.
+  - Typed data structures.
+  - Strict schemas.
+  - Clear error handling.
+- Avoid:
+  - Unnecessary microservices.
+  - Premature distributed architecture.
+  - Unnecessary frameworks.
+  - Hidden execution behavior.
+  - Duplicated sources of truth.
+- *Non-negotiable*: The initial release MUST operate as a local Python application.
+- *Rationale*: Minimal external dependencies and local execution architecture guarantee low latency, easy deployment, and zero external service coupling.
 
-### 1. Verification Gates
-Every change proposed to the codebase MUST satisfy all quality gates before merge or deployment:
-1. **Contract/Unit Test Suite**: 100% of unit and contract tests MUST pass (`pytest`).
-2. **Static Type Verification**: Strict type checking MUST pass with zero errors (`mypy --strict`).
-3. **Style & Linting**: Zero errors reported by `ruff check` and `ruff format --check`.
-4. **Boundary & Security Checks**: No detected secrets, unvetted external dependencies, or insecure subprocess calls.
-5. **State Transition & Idempotency Tests**: Workflows and orchestration steps MUST pass replay and recovery verification tests.
+### XII. Git Integrity
+Git MUST provide task-level checkpoints.
+- Every successfully verified task SHOULD receive an individual commit.
+- Existing user modifications MUST be preserved.
+- Destructive Git operations MUST require explicit approval.
+- Remote pushes MUST remain disabled by default.
+- Failed tasks MUST NOT compromise previously completed work.
+- *Rationale*: Granular, clean commits provide rollback capabilities, atomic checkpoints, and ensure that failed task attempts can be cleanly aborted.
 
-### 2. Code Review & Compliance
-- Pull requests and code contributions MUST explicitly cite the principle(s) supported by the change.
-- Any architectural deviation or introduction of an external dependency requires explicit constitutional review and justification in the pull request description.
+### XIII. Controlled Evolution
+Future capabilities MUST preserve the existing security boundaries.
+The architecture SHOULD support:
+- Parallel execution through isolated Git worktrees.
+- Additional local models.
+- Alternative inference engines.
+- Additional tool adapters.
+- External audit storage.
+- Richer verification strategies.
+- *Non-negotiable*: These capabilities MUST NOT compromise deterministic orchestration or least-privilege execution.
+- *Rationale*: System evolution must be forward-compatible with multi-model and multi-worktree execution without degrading foundational safety invariants.
+
+## Architectural & Environmental Constraints
+
+### 1. Hardware & Runtime Budget
+- **Operating System**: Windows 11.
+- **Hardware Targets**: NVIDIA RTX 4060 Laptop GPU (8 GB VRAM), 16 GB system RAM.
+- **Inference Runtime**: Local `llama.cpp` instance; model context sizes, prompt formatting, and sampling parameters MUST be configurable externally without code modification.
+- **Application Structure**: Local standalone Python 3.11+ application using standard library modules and SQLite. Distributed services, microservices, and multi-node architectures are strictly prohibited for initial releases.
+
+### 2. Tool Gateway & Policy Enforcement
+- **Interface Boundary**: All interactions with the filesystem, process execution, and network MUST pass through the Tool Gateway.
+- **Schema Contracts**: Every tool input and output MUST validate against explicit, strict JSON schemas.
+- **Filesystem Isolation**: File access MUST be confined to the project root. Tasks MUST operate strictly within pre-declared, task-specific file path allowances.
+- **Command Whitelisting**: Process and shell executions MUST adhere to strict policy allowlists; raw, unrestricted shell interpretation is prohibited.
+- **Least Privilege**: Any action exceeding predefined autonomous scopes MUST halt and demand explicit human approval.
+
+### 3. State Reconciliation & Audit
+- **SQLite Persistence**: Execution state, task graph metadata, retry counts, and status flags MUST be persisted transactionally in SQLite.
+- **Reconciliation on Recovery**: Following unexpected termination, the orchestrator MUST inspect Git status and filesystem diffs to reconcile SQLite records with disk realities before continuing.
+
+## Verification Gates & Compliance Workflow
+
+### 1. Verification Workflow
+Every task execution MUST traverse mandatory deterministic gates:
+1. **Scope Gate**: SpecKit specification and task boundaries are checked for completeness, dependencies, and explicit file limits.
+2. **Policy Gate**: Policy Engine evaluates every tool request against global and task-specific rules prior to invocation.
+3. **Execution Gate**: Runtime executes authorized tools, capturing execution parameters, return payloads, exit codes, and timestamps.
+4. **Independent Verification Gate**: Verification Engine executes configured test suites (`pytest`), validates exit codes, and checks Git diffs. Model claims of success are rejected without verifiable external evidence.
+5. **Audit Gate**: Audit Ledger commits append-only records of all requests, decisions, executions, and verification evidence.
+6. **Git Checkpoint Gate**: Upon passing all verification checks, the system creates an isolated task commit.
+
+### 2. Scope Violations & Blocked State
+- When FrogNano or any component encounters an architectural conflict or requires file modifications outside its assigned boundaries, it MUST immediately yield a `BLOCKED` status.
+- Scope adjustments or specification amendments MUST originate exclusively from the planning agent (Gemini/Antigravity) via SpecKit.
 
 ## Governance
 
-This Constitution represents the supreme architectural and operational standard for the Frognano Harness project. All design specifications, implementation plans, task breakdowns, pull requests, and code modifications MUST comply with its principles.
+This Constitution represents the supreme architectural and operational standard for the Frognano Harness project. All design specifications, implementation plans, task breakdowns, pull requests, and runtime components MUST strictly adhere to its principles and constraints.
 
 ### Amendment Procedure
-- Amendments to this Constitution may be proposed through a dedicated Pull Request updating `.specify/memory/constitution.md`.
-- Amendments require explicit documentation of rationale, potential impact analysis, and updates to dependent guidelines or templates.
-- Version numbering follows strict Semantic Versioning:
-  - **MAJOR** (e.g., 2.0.0): Removal, breaking redefinition, or fundamental restructuring of core principles or governance policies.
-  - **MINOR** (e.g., 1.1.0): Addition of new principles, material expansion of quality standards, or new verification gates.
-  - **PATCH** (e.g., 1.0.1): Clarifications, phrasing improvements, typographical fixes, and non-semantic refinements.
+- Amendments to this Constitution MUST be proposed through a dedicated Pull Request modifying `.specify/memory/constitution.md`.
+- Proposed amendments MUST include detailed rationale, an impact assessment across all runtime components, and necessary migration guidance.
+- Version numbering adheres strictly to Semantic Versioning:
+  - **MAJOR** (e.g., 3.0.0): Breaking alterations, redefinitions, or removals of core principles, security models, or governance rules.
+  - **MINOR** (e.g., 2.1.0): Introduction of new principles, new runtime adapters, or material expansion of operational constraints.
+  - **PATCH** (e.g., 2.0.1): Clarifications, non-semantic wording enhancements, and typographical corrections.
 
 ### Compliance & Review
-- Automated CI workflows and manual review checklists MUST verify compliance with this Constitution on every feature branch.
-- In any conflict between ad-hoc conventions and this Constitution, the provisions of this Constitution prevail.
+- No component or LLM may bypass or override this Constitution.
+- In any conflict between prompt instructions, model preferences, and this Constitution, this Constitution MUST prevail.
+- Verification Engine checks and Audit Ledger logs MUST be reviewed for constitutional compliance during development and CI evaluations.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-01
+**Version**: 2.0.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-01
