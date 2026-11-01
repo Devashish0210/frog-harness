@@ -8,6 +8,13 @@
 
 **Input**: User description: "Build a deterministic, task-driven software engineering execution system that connects GitHub SpecKit with a locally hosted coding model (FrogNano-4B) through an OpenAI-compatible llama.cpp server."
 
+## Clarifications
+
+### Session 2026-11-01
+- Q: What interaction protocol should the harness use to receive file inspections, edits, and terminal commands from the local FrogNano-4B model via llama.cpp? (FR-004) → A: Hybrid protocol (Option C: prioritize native OpenAI tool calling schemas (`tools` / `tool_calls`), falling back to parsing structured markdown action code fences if tool calls are omitted or malformed).
+- Q: Where should the SQLite persistence database and runtime artifacts (execution logs, checkpoints, supervisory reports) be stored within the workspace? (FR-013) → A: Dedicated `.harness/` directory in the project root (`.harness/state.db`, `.harness/logs/`, `.harness/reports/`), automatically excluded from Git tracking via `.gitignore`.
+- Q: How should the harness enforce file modification boundaries when an implementation task requires creating a new file? (FR-005) → A: Explicit pre-declaration only (Option A: bounded autonomy; the planner pre-declares all affected and created files in `allowed_files` in `tasks.md`, and the coder model cannot create or touch undeclared files).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - SpecKit Task Discovery, DAG Resolution, and Plan Preview (Priority: P1)
@@ -37,8 +44,8 @@ As a developer running local models on Windows 11, I want the harness to constru
 **Acceptance Scenarios**:
 
 1. **Given** an eligible task and an available local llama.cpp server at `http://127.0.0.1:8080/v1`, **When** the harness dispatches the task, **Then** it sends a structured task envelope containing the task objective, relevant specification sections, and allowed file boundaries within a configurable context limit (default 65,536 tokens).
-2. **Given** an active model implementation session, **When** the model requests to read or modify files within `allowed_files`, **Then** the harness safely executes the file operations and captures the changes in the execution log.
-3. **Given** an active model implementation session, **When** the model attempts to write outside the project root, modify files outside `allowed_files`, or access protected secret files (such as `.env`), **Then** the harness immediately blocks the operation, records a security violation, and prevents file mutation.
+2. **Given** an active model implementation session, **When** the model requests to read or modify files within `allowed_files` (via native tool calls or structured markdown blocks), **Then** the harness safely executes the file operations and captures the changes in the execution log.
+3. **Given** an active model implementation session, **When** the model attempts to write outside the project root, create or modify files outside pre-declared `allowed_files`, or access protected secret files (such as `.env`), **Then** the harness immediately blocks the operation under bounded autonomy, records a security violation, and prevents file mutation.
 
 ---
 
@@ -108,7 +115,7 @@ As a developer troubleshooting an environmental blocker or updating a dependency
 ### Edge Cases
 
 - **Inference Server Disconnection**: If the llama.cpp server at `http://127.0.0.1:8080/v1` becomes unreachable or drops connection during model generation, the harness MUST capture the connection error, apply bounded exponential backoff retries, and escalate to `BLOCKED` if the server does not recover within a configurable timeout.
-- **Malformed Model Output**: If FrogNano produces invalid tool call syntax, unclosed JSON blocks, or truncated responses, the harness MUST detect the structural error, record an invalid output attempt, and provide targeted formatting guidance in the retry prompt.
+- **Malformed Model Output**: If FrogNano produces invalid tool call syntax, unclosed JSON blocks, or truncated responses, the harness MUST detect the structural error, attempt fallback parsing via structured markdown code fences, and if unparseable, record an invalid output attempt and provide targeted formatting guidance in the retry prompt.
 - **Dirty Pre-Execution Working Tree**: If the Git repository contains uncommitted changes before task execution starts, the harness MUST warn the user and refuse to execute until the user explicitly commits or stashes existing changes, preventing accidental data loss.
 - **Non-Terminating Verification Tests**: If a verification command hangs (e.g., infinite loop, waiting on stdin), the harness MUST enforce a mandatory per-command execution timeout (default 120 seconds), terminate the hung subprocess, and record a timeout failure.
 - **Path Traversal Attacks**: If the model attempts to read or write paths containing relative traversal (`../` or `..\`) resolving outside the workspace root, the harness MUST abort the operation immediately and log a security violation.
@@ -121,8 +128,8 @@ As a developer troubleshooting an environmental blocker or updating a dependency
 - **FR-001**: System MUST automatically discover and parse standard GitHub SpecKit `tasks.md` files, extracting task metadata, objectives, dependencies, file boundaries, acceptance criteria, and verification commands.
 - **FR-002**: System MUST construct a Directed Acyclic Graph (DAG) representing task dependencies, detect circular dependencies, and compute topological execution sequence.
 - **FR-003**: System MUST assemble a structured task execution envelope for each atomic task containing only relevant specification extracts, allowed file contents, and essential task history without overflowing the configurable context limit (default 65,536 tokens).
-- **FR-004**: System MUST communicate with local llama.cpp via its OpenAI-compatible endpoint (`http://127.0.0.1:8080/v1`) using model alias `frognano`.
-- **FR-005**: System MUST strictly restrict model file operations (read/write/create) to the project repository root and explicitly enforce task `allowed_files` boundaries.
+- **FR-004**: System MUST communicate with local llama.cpp via its OpenAI-compatible endpoint (`http://127.0.0.1:8080/v1`) using model alias `frognano`, supporting a hybrid interaction protocol that prioritizes native OpenAI tool calling schemas (`tools` / `tool_calls`) and deterministically falls back to parsing structured markdown action code fences if tool calls are missing or malformed.
+- **FR-005**: System MUST strictly restrict model file operations (read/write/create) to the project repository root and explicitly enforce task `allowed_files` boundaries; any file to be created or modified MUST be pre-declared by the planner in `allowed_files`, and attempts to create or touch undeclared files MUST be blocked immediately.
 - **FR-006**: System MUST enforce protection for sensitive configuration files (`.env`, credentials, private keys), rejecting any attempt to read, write, or expose secrets to the model prompt.
 - **FR-007**: System MUST provide a configurable command allowlist for model-initiated commands, strictly preventing unrestricted administrative or dangerous commands (`rmdir /s`, `format`, network egress).
 - **FR-008**: System MUST execute verification commands in an isolated subprocess, capturing standard output, standard error, execution duration, and process exit codes.
@@ -130,9 +137,9 @@ As a developer troubleshooting an environmental blocker or updating a dependency
 - **FR-010**: System MUST automatically initiate bounded correction retries (default 2 retries per task) upon verification failure, feeding test failure output back to the model.
 - **FR-011**: System MUST escalate a task to `BLOCKED` when retries are exhausted or when the model explicitly reports a blockage, halting dependent downstream tasks while allowing independent branches to proceed.
 - **FR-012**: System MUST create an individual Git commit for each successfully verified task, formatting the commit message with the task ID and title, and NEVER push automatically to remote repositories.
-- **FR-013**: System MUST persist all execution metadata (runs, task states, attempts, logs, verification outcomes, commit hashes) in a local SQLite database.
+- **FR-013**: System MUST persist all execution metadata (runs, task states, attempts, logs, verification outcomes, commit hashes) in a local SQLite database located in a dedicated `.harness/` directory at the project root (`.harness/state.db`), keeping execution logs (`.harness/logs/`) and runtime state isolated from Git tracking.
 - **FR-014**: System MUST reconcile persisted SQLite state with the Git working tree upon restart, enabling seamless resumption via `resume` without re-executing completed tasks.
-- **FR-015**: System MUST generate structured machine-readable reports (JSON and Markdown) summarizing run progress, task outcomes, commit hashes, test results, and recommendations for Antigravity/Gemini.
+- **FR-015**: System MUST generate structured machine-readable reports (JSON and Markdown) summarizing run progress, task outcomes, commit hashes, test results, and recommendations for Antigravity/Gemini, outputting to `.harness/reports/` by default and printing human-readable summaries to stdout.
 - **FR-016**: System MUST provide a comprehensive CLI for Windows PowerShell supporting `init`, `validate`, `plan`, `run`, `resume`, `status`, `task`, `retry`, `report`, `logs`, and `verify`.
 
 ### Key Entities *(include if feature involves data)*
