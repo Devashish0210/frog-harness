@@ -1,0 +1,252 @@
+Project: Local Agentic Coding Execution Harness
+Build a deterministic, task-driven software engineering execution system that connects GitHub SpecKit with a locally hosted coding model (FrogNano-4B) through an OpenAI-compatible llama.cpp server.
+1. Core Objective
+The system must separate software engineering planning from software implementation.
+• Antigravity/Gemini is responsible for requirements analysis, architecture, specification, implementation planning and atomic task generation through GitHub SpecKit.
+• FrogNano-4B is responsible exclusively for implementing individual atomic tasks.
+• A Python orchestration engine manages task dispatch, execution, verification, retries, Git operations, state persistence and recovery.
+The system must not require Gemini to manually copy tasks into FrogNano. Task handover must be automated.
+The execution engine must be deterministic wherever possible. LLMs should make implementation decisions only where necessary. Workflow control, validation, task sequencing and state transitions must be handled programmatically.
+2. Target Environment
+Primary hardware:
+• NVIDIA RTX 4060 Laptop GPU (8 GB VRAM).
+• Intel Core i7-13620H.
+• 16 GB DDR5 RAM.
+• Windows 11.
+• Docker Desktop with WSL2.
+Inference:
+• llama.cpp running locally.
+• OpenAI-compatible API endpoint: http://127.0.0.1:8080/v1
+• Model alias: frognano.
+• Default context: 65,536 tokens per slot.
+• Two inference slots available.
+• Flash Attention enabled.
+• Q4_K_M model quantization.
+• Q4_0 KV cache quantization.
+The inference server is external to the orchestration application. The application must not manage model downloads or server installation.
+All components must work on Windows 11.
+3. Primary Workflow
+The system must support the following lifecycle:
+1. Gemini generates the project specification using SpecKit.
+2. Gemini generates the implementation plan.
+3. Gemini generates atomic tasks.
+4. The execution engine discovers and parses tasks.md.
+5. The engine constructs an execution DAG using task dependencies.
+6. The engine selects the next eligible task.
+7. The engine gathers the required task context.
+8. The engine dispatches the task to FrogNano through llama.cpp.
+9. FrogNano examines the codebase, implements the task and runs permitted tests.
+10. The engine independently executes mandatory verification commands.
+11. The engine validates the result against acceptance criteria.
+12. Successful tasks are committed individually to Git.
+13. Failed tasks enter a bounded retry or escalation workflow.
+14. Execution state is persisted.
+15. Gemini receives a structured execution report.
+16. Gemini can resolve blockers, revise tasks when necessary and initiate another execution cycle.
+The workflow must support interruption and resumption without repeating successfully completed tasks.
+4. Task Contract
+Every task must have a structured representation.
+Required fields:
+• task_id
+• title
+• description
+• objective
+• dependencies
+• affected_files
+• allowed_files
+• relevant_specification_sections
+• implementation_requirements
+• acceptance_criteria
+• verification_commands
+• completion_conditions
+The engine must parse existing SpecKit tasks.md files and derive missing contextual information where possible.
+Do not require users to manually duplicate the entire SpecKit task list into another format.
+Where additional information is necessary, the engine should construct a task execution envelope automatically.
+5. FrogNano Execution Engine
+Implement an executor that communicates with the local llama.cpp server using its OpenAI-compatible API.
+Responsibilities:
+• Send structured task instructions.
+• Provide relevant source files and specifications.
+• Allow repository inspection.
+• Allow controlled file modifications.
+• Allow terminal commands required for implementation and testing.
+• Capture model responses and execution traces.
+• Detect incomplete responses and malformed tool calls.
+• Return structured execution results.
+FrogNano must operate on one atomic task at a time initially.
+It must not independently:
+• Change project architecture.
+• Modify SpecKit specifications.
+• Rewrite implementation plans.
+• Change acceptance criteria.
+• Mark tasks complete without evidence.
+• Modify unrelated files without authorization.
+If a task requires architectural changes or exceeds its assigned scope, FrogNano must report BLOCKED and explain the reason.
+6. Context Management
+Context management is a critical requirement.
+The engine must avoid sending the entire codebase or complete project history with every task.
+Implement:
+• Task-specific context assembly.
+• Relevant specification extraction.
+• Dependency-aware context retrieval.
+• Source file selection.
+• Previous task result retrieval.
+• Configurable observation truncation.
+• Conversation history management.
+• Context usage monitoring.
+• Configurable context limits.
+The default context limit must be configurable, with 65,536 tokens as the initial target.
+The engine must preserve important implementation decisions when starting a new task.
+Never silently truncate mandatory requirements or acceptance criteria.
+7. Verification Engine
+The orchestration engine must independently verify every implementation.
+Verification must include:
+1. Check that permitted files were modified.
+2. Check that forbidden files were not modified.
+3. Run prescribed test commands.
+4. Capture stdout and stderr.
+5. Capture process exit codes.
+6. Validate completion requirements.
+7. Detect missing or unexpected changes.
+8. Produce a structured verification report.
+A task cannot be marked successful simply because FrogNano claims it is complete.
+A task is eligible for completion only when its mandatory verification conditions pass.
+If tests fail, the engine may dispatch a bounded correction attempt.
+Default retry limit: 2.
+After exhausting retries, mark the task BLOCKED and request Gemini's intervention.
+Do not silently skip failing tests.
+8. Git Integration
+Git must provide task-level implementation checkpoints.
+Requirements:
+• Inspect repository status before execution.
+• Preserve unrelated user modifications.
+• Create a checkpoint before implementation.
+• Commit each successfully verified task individually.
+• Use meaningful commit messages containing task IDs.
+• Maintain traceability between commits and tasks.
+• Never automatically push to remote repositories.
+• Never perform destructive Git operations without explicit authorization.
+A failed task must not destroy previously completed work.
+The system must detect unexpected modifications before attempting rollback.
+9. Task Scheduling and Dependencies
+Implement a dependency-aware task scheduler.
+Requirements:
+• Parse task dependencies.
+• Detect circular dependencies.
+• Identify ready tasks.
+• Execute tasks in dependency order.
+• Prevent execution of blocked tasks.
+• Track completed, pending, running, failed and blocked tasks.
+• Support sequential execution initially.
+The architecture should permit future parallel execution of independent tasks through isolated Git worktrees.
+However, parallel execution must remain disabled in the initial release.
+10. Persistent Execution State
+The system must survive:
+• Terminal closure.
+• Windows restarts.
+• llama.cpp server interruptions.
+• Model generation failures.
+• Network/API timeouts.
+• Agent execution failures.
+• Interrupted test execution.
+Persist state locally using SQLite.
+Track:
+• Project identifier.
+• Execution run identifier.
+• Task status.
+• Task attempts.
+• Task dependencies.
+• Dispatch timestamps.
+• Execution duration.
+• Model responses.
+• Verification results.
+• Git commit hashes.
+• Error messages.
+• Recovery information.
+On restart, the engine must reconcile persisted state with the actual Git repository before resuming.
+Never blindly repeat a task that may have already modified the repository.
+11. Gemini Integration
+Gemini remains the planning and supervisory agent.
+The execution engine must expose machine-readable execution reports that Antigravity can consume.
+Reports must contain:
+• Overall project progress.
+• Completed tasks.
+• Failed tasks.
+• Blocked tasks.
+• Verification outcomes.
+• Git commit references.
+• Implementation summaries.
+• Outstanding issues.
+• Recommended next actions.
+The engine must not require Gemini to remain active throughout the entire implementation process.
+It should be possible to start execution, allow the runner to work independently and review the resulting report later.
+The architecture should support future integration with Antigravity through CLI commands or structured files.
+Do not assume undocumented Antigravity APIs exist.
+12. Safety and Execution Isolation
+The system executes code generated by an LLM. Safety is mandatory.
+Requirements:
+• Project-root filesystem restrictions.
+• Configurable allowed-file boundaries.
+• Explicit protection for .env and credential files.
+• No automatic access to unrelated directories.
+• No automatic remote Git pushes.
+• No unrestricted administrative commands.
+• Configurable command allowlist.
+• Explicit approval for destructive operations.
+• Execution logs for every command.
+• No secrets included in model prompts.
+Do not use --dangerously-skip-permissions as a substitute for execution isolation.
+13. Observability
+Provide a CLI interface with clear execution visibility.
+Example:
+LOCAL AGENTIC CODING RUNNER
+Project: RAG Engine Model: FrogNano-4B Inference: localhost:8080 Context: 65K Execution: Sequential
+Tasks: [✓] T001 - Initialize project structure [✓] T002 - Configure database [>] T003 - Implement repository layer [ ] T004 - Implement API endpoints [ ] T005 - Add integration tests
+Current task: T003 Attempt: 1/2 Model status: Generating Verification: Pending
+Hardware telemetry is optional and must not interfere with inference.
+14. CLI Interface
+Provide the following commands:
+• init: Initialize a project for execution.
+• validate: Validate SpecKit task definitions.
+• plan: Display the execution DAG.
+• run: Start task execution.
+• resume: Resume an interrupted execution.
+• status: Display project execution status.
+• task: Display detailed task information.
+• retry: Retry an eligible failed task.
+• report: Generate an execution report.
+• logs: Inspect task execution traces.
+• verify: Independently rerun task verification.
+The interface must be usable from Windows PowerShell.
+15. Initial Release Scope
+Prioritize a functional end-to-end execution pipeline.
+The first release must demonstrate:
+1. Discovering an existing SpecKit project.
+2. Reading tasks.md.
+3. Parsing and validating tasks.
+4. Building a dependency graph.
+5. Connecting to llama.cpp.
+6. Dispatching a task to FrogNano.
+7. Allowing controlled implementation.
+8. Running tests independently.
+9. Committing a successful task.
+10. Persisting execution state.
+11. Resuming after interruption.
+12. Generating a report for Gemini.
+Do not build a graphical interface.
+Do not introduce unnecessary frameworks or external services.
+Prefer Python's standard library wherever practical. Use SQLite for persistence and a lightweight HTTP client for model communication.
+16. Success Criteria
+The project is considered successful when:
+• A SpecKit project can be loaded without manual task duplication.
+• Its task dependencies are correctly interpreted.
+• FrogNano can implement an eligible task using the local inference server.
+• The engine independently verifies implementation results.
+• Successful tasks receive individual Git commits.
+• Failed tasks are handled through bounded retries.
+• Execution state survives application restarts.
+• The engine resumes without repeating completed tasks.
+• Gemini can inspect machine-readable results and make subsequent planning decisions.
+• The entire workflow runs locally on Windows 11 without requiring paid API calls for implementation.
+The central design principle:
+Gemini thinks. SpecKit structures. Python orchestrates. FrogNano executes. Deterministic verification decides whether work is complete.
