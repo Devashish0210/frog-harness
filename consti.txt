@@ -1,0 +1,158 @@
+Constitution: Local Agentic Coding Execution Harness
+Article I — Separation of Intelligence and Execution
+The system MUST maintain strict separation between planning, implementation, orchestration, authorization and verification.
+• Gemini/Antigravity is the planning and supervisory intelligence.
+• GitHub SpecKit is the source of truth for specifications, plans and atomic tasks.
+• Python orchestrator controls execution order, task state and workflow transitions.
+• FrogNano is the local implementation agent.
+• Tool Gateway controls all interactions between the model and the operating environment.
+• Policy Engine authorizes or denies operations.
+• Verification Engine independently evaluates implementation results.
+• Audit Ledger maintains a traceable execution history.
+No LLM may override deterministic workflow controls or security policies.
+Article II — Deterministic Orchestration
+All workflow control MUST be implemented programmatically.
+The orchestrator MUST:
+• Maintain explicit task states.
+• Enforce task dependencies.
+• Prevent execution of incomplete dependencies.
+• Apply configurable retry limits.
+• Persist state across interruptions.
+• Support deterministic recovery.
+• Prevent duplicate execution of completed tasks.
+• Validate all state transitions.
+LLMs MUST NOT independently determine workflow completion.
+Article III — Security by Default
+All model-generated operations MUST pass through the Tool Gateway.
+Direct, unrestricted shell or filesystem access by the model is prohibited.
+The Policy Engine MUST enforce:
+• Project-root filesystem boundaries.
+• Task-specific read/write permissions.
+• Command execution restrictions.
+• Global security policies.
+• Risk classification.
+• Human approval requirements.
+• Secret and credential protection.
+Default permissions MUST follow the principle of least privilege.
+Denied operations MUST NOT be executed.
+Human approval MUST be required for operations outside predefined autonomous permissions.
+Global security policies MUST take precedence over task-level permissions.
+Article IV — Independent Authorization and Verification
+Authorization and verification MUST be separate responsibilities.
+• Policy Engine determines whether an operation is permitted.
+• Execution Runtime performs authorized operations.
+• Verification Engine evaluates their actual effects.
+• Audit Ledger records all stages.
+An LLM cannot authorize its own privileged operations.
+An LLM cannot declare its own implementation verified.
+Task completion MUST be based on independently collected evidence.
+Article V — Tool Execution Contracts
+Every tool MUST have:
+• A unique identifier.
+• A strict input schema.
+• Explicit permissions.
+• Defined execution behavior.
+• Structured output.
+• Error handling.
+• Audit events.
+Tool implementations MUST NOT bypass authorization.
+Tool calls MUST be validated before execution.
+The runtime MUST record actual executed arguments, execution status and resulting artifacts.
+Article VI — Immutable Task Scope
+Every implementation task MUST have:
+• A defined objective.
+• Explicit requirements.
+• Acceptance criteria.
+• Relevant context.
+• Permitted file boundaries.
+• Verification requirements.
+• Dependencies.
+FrogNano MUST NOT silently expand task scope.
+If implementation requires architectural changes or modifications outside its authorized boundaries, it MUST return a BLOCKED result.
+Only the planning agent may propose changes to specifications or task definitions.
+Article VII — Test-Driven and Evidence-Based Development
+Implementation MUST be accompanied by appropriate tests.
+The system MUST independently execute prescribed verification commands.
+A successful model response is not evidence of successful implementation.
+The system MUST:
+• Capture test output.
+• Capture process exit codes.
+• Validate Git diffs.
+• Detect unauthorized modifications.
+• Preserve failed verification evidence.
+• Prevent unsuccessful tasks from being marked complete.
+Tests MUST NOT be silently skipped to obtain a successful status.
+Article VIII — Auditability and Traceability
+Every execution MUST be traceable.
+The Audit Ledger MUST record:
+• Execution run identifiers.
+• Task identifiers.
+• Model identity.
+• Tool requests.
+• Authorization decisions.
+• Human approvals.
+• Actual execution arguments.
+• Execution results.
+• Verification outcomes.
+• Git commit references.
+• Timestamps.
+• Failure information.
+Audit events MUST be append-only at the application level.
+The system MUST support reconstruction of a task's execution history.
+Sensitive credentials MUST never be written into audit logs.
+Article IX — Recoverability and State Persistence
+Execution state MUST survive:
+• Application termination.
+• Operating system restarts.
+• Inference server failures.
+• Interrupted model generation.
+• Tool execution failures.
+• Test failures.
+SQLite MUST provide initial persistent state storage.
+Recovery MUST reconcile persisted execution state against the actual repository and Git history before resuming.
+The system MUST NOT assume that an interrupted operation had no side effects.
+Article X — Resource Efficiency
+The system MUST be designed for the target hardware:
+• NVIDIA RTX 4060 Laptop GPU, 8 GB VRAM.
+• 16 GB system RAM.
+• Windows 11.
+• Local llama.cpp inference.
+The implementation MUST minimize unnecessary services, memory consumption and context usage.
+The system MUST use task-specific context assembly rather than repeatedly sending entire project histories.
+Inference configuration MUST remain external and configurable.
+Article XI — Simplicity and Maintainability
+Prefer:
+• Python standard library where practical.
+• SQLite for local persistence.
+• Explicit interfaces between components.
+• Small, independently testable modules.
+• Typed data structures.
+• Strict schemas.
+• Clear error handling.
+Avoid:
+• Unnecessary microservices.
+• Premature distributed architecture.
+• Unnecessary frameworks.
+• Hidden execution behavior.
+• Duplicated sources of truth.
+The initial release MUST operate as a local Python application.
+Article XII — Git Integrity
+Git MUST provide task-level checkpoints.
+• Every successfully verified task SHOULD receive an individual commit.
+• Existing user modifications MUST be preserved.
+• Destructive Git operations MUST require explicit approval.
+• Remote pushes MUST remain disabled by default.
+• Failed tasks MUST NOT compromise previously completed work.
+Article XIII — Controlled Evolution
+Future capabilities MUST preserve the existing security boundaries.
+The architecture SHOULD support:
+• Parallel execution through isolated Git worktrees.
+• Additional local models.
+• Alternative inference engines.
+• Additional tool adapters.
+• External audit storage.
+• Richer verification strategies.
+These capabilities MUST NOT compromise deterministic orchestration or least-privilege execution.
+Core Engineering Principle
+Gemini plans. SpecKit structures. Python orchestrates. FrogNano implements. The Policy Engine authorizes. The Runtime executes. The Verification Engine verifies. The Audit Ledger remembers.
+No component may silently assume another component's authority.

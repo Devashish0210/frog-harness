@@ -1,0 +1,376 @@
+Project: Local Agentic Coding Harness
+1. Product Vision
+Build a deterministic, locally operated, resumable software engineering execution harness that connects GitHub SpecKit with a locally hosted coding model through an OpenAI-compatible inference endpoint.
+The system separates planning from implementation.
+Antigravity/Gemini performs requirements analysis, architecture planning and task decomposition through SpecKit.
+FrogNano-4B executes atomic implementation tasks using controlled tools exposed by the harness.
+A Python orchestration engine coordinates task execution, permissions, verification, Git operations, state persistence and reporting.
+The application must operate locally on Windows 11 without requiring paid API calls for implementation.
+2. Target Environment
+Hardware:
+• NVIDIA RTX 4060 Laptop GPU, 8 GB VRAM.
+• Intel Core i7-13620H.
+• 16 GB DDR5 RAM.
+• Windows 11.
+• Docker Desktop with WSL2.
+Inference:
+• llama.cpp.
+• OpenAI-compatible endpoint: http://127.0.0.1:8080/v1
+• Model alias: frognano.
+• Target context: 65,536 tokens per slot.
+• Two available inference slots.
+The inference server is externally managed.
+All configuration MUST be adjustable without modifying application source code.
+3. System Architecture
+The application MUST contain the following logical components:
+1. Orchestrator.
+2. SpecKit Task Parser.
+3. Task Scheduler.
+4. FrogNano Inference Client.
+5. Context Manager.
+6. Tool Gateway.
+7. Policy and Authorization Engine.
+8. Tool Execution Runtime.
+9. Human Approval Manager.
+10. Independent Verification Engine.
+11. Git Manager.
+12. Audit Ledger.
+13. Persistent State Manager.
+14. CLI Interface.
+15. Gemini Reporting Interface.
+These MUST initially operate within a single Python application.
+Components MUST communicate through explicit interfaces and structured contracts.
+The Tool Gateway MUST be the exclusive entry point for model-requested tool operations.
+4. Primary Workflow
+1. Gemini creates a specification using SpecKit.
+2. Gemini creates the implementation plan.
+3. Gemini generates atomic tasks.
+4. The harness discovers the SpecKit project.
+5. The Task Parser reads tasks.md.
+6. The Scheduler constructs a dependency graph.
+7. The Context Manager prepares task-specific context.
+8. The Dispatcher sends the task to FrogNano.
+9. FrogNano requests tools through the Tool Gateway.
+10. The Policy Engine evaluates each request.
+11. Authorized operations are executed through controlled adapters.
+12. Operations requiring approval are paused until authorized.
+13. The Verification Engine independently validates implementation results.
+14. Successful tasks are committed to Git.
+15. All operations and decisions are recorded in the Audit Ledger.
+16. Execution state is persisted.
+17. Gemini receives structured reports.
+18. Failed or blocked tasks are escalated for replanning.
+The execution engine MUST be able to run independently after Gemini has generated the tasks.
+5. SpecKit Integration
+Support existing SpecKit project structures.
+The application MUST:
+• Discover the project root.
+• Read constitution.md.
+• Read specification documents.
+• Read plan.md.
+• Parse tasks.md.
+• Extract task identifiers.
+• Extract task dependencies.
+• Extract task descriptions and acceptance criteria.
+• Identify parallelizable tasks.
+• Detect malformed task definitions.
+• Detect dependency cycles.
+The harness MUST NOT require users to manually duplicate tasks into a separate planning system.
+Additional execution metadata MUST be derived automatically where possible.
+If mandatory execution information is missing, the harness MUST report it instead of inventing requirements.
+6. Task Execution Contract
+Each task MUST be represented internally through a structured execution envelope.
+Required information:
+• Task ID.
+• Title.
+• Objective.
+• Description.
+• Dependencies.
+• Relevant specification sections.
+• Relevant source files.
+• Allowed read paths.
+• Allowed write paths.
+• Implementation requirements.
+• Acceptance criteria.
+• Verification commands.
+• Completion conditions.
+Task permissions MUST be derived from global policy and task-specific constraints.
+Task-level permissions MUST never expand global permissions.
+FrogNano MUST return structured execution outcomes:
+• COMPLETED.
+• BLOCKED.
+• FAILED.
+• NEEDS_REVIEW.
+The harness MUST determine final task status independently.
+7. Tool Gateway
+Build the Tool Gateway as an independent internal module.
+It MUST:
+• Receive model-generated tool requests.
+• Validate tool names and argument schemas.
+• Assign unique tool-call identifiers.
+• Normalize and validate arguments.
+• Consult the Policy Engine.
+• Dispatch authorized operations.
+• Route approval-required operations to the Approval Manager.
+• Capture execution results.
+• Return structured responses to FrogNano.
+FrogNano MUST NOT directly access the filesystem, subprocess interface or Git APIs outside this gateway.
+Initial Tool Registry
+Implement the following tools:
+Filesystem:
+• read_file
+• list_files
+• search_code
+• write_file
+• apply_patch
+Terminal:
+• run_command
+Testing:
+• run_tests
+Git:
+• git_status
+• git_diff
+• git_commit
+Each tool MUST have a strict schema and explicit permission requirements.
+The registry MUST be extensible.
+8. Policy and Authorization Engine
+Implement a deterministic Python authorization engine.
+Every tool request MUST be evaluated before execution.
+Authorization MUST consider:
+• Tool identity.
+• Requested arguments.
+• Project root.
+• Task identity.
+• Task permissions.
+• Global permissions.
+• File boundaries.
+• Command restrictions.
+• Risk classification.
+• Current execution state.
+Possible decisions:
+• ALLOW.
+• DENY.
+• REQUIRE_APPROVAL.
+Initial Permission Policy
+Low-risk operations such as reading permitted files and searching code MAY execute automatically.
+Medium-risk operations such as writing authorized source files, running approved tests and creating task-scoped commits MAY execute automatically within strict boundaries.
+High-risk operations such as deleting files, installing packages, changing permissions or accessing external paths MUST require human approval.
+Access to credentials, unrelated personal directories and prohibited operations MUST be denied.
+The engine MUST enforce restrictions at execution time.
+Path validation MUST account for path traversal, symbolic links and Windows path normalization.
+Command execution MUST use controlled process invocation rather than unrestricted shell-string execution.
+An allowlisted executable MUST NOT automatically authorize arbitrary arguments or arbitrary secondary commands.
+9. Human Approval Manager
+Implement a mechanism for requesting human approval.
+Approval requests MUST include:
+• Approval ID.
+• Tool-call ID.
+• Requesting task.
+• Requested operation.
+• Exact arguments.
+• Reason for the request.
+• Risk classification.
+• Potential side effects.
+The application MUST support approval and rejection through its CLI.
+Approval MUST be bound to the specific operation and arguments.
+Changing the arguments after approval MUST require a new authorization decision.
+The system MUST never automatically approve expired or unresolved requests.
+10. Tool Execution Runtime
+Implement controlled adapters for:
+• Filesystem operations.
+• Terminal operations.
+• Git operations.
+• Test execution.
+All operations MUST execute within the authorized project environment.
+The runtime MUST:
+• Capture stdout and stderr.
+• Capture exit codes.
+• Enforce timeouts.
+• Record execution duration.
+• Record affected files.
+• Detect execution failures.
+• Return structured results.
+The runtime MUST NOT expose unrestricted operating system privileges to FrogNano.
+Implement execution isolation appropriate for Windows 11.
+11. Independent Verification Engine
+Verification MUST be independent of FrogNano's claims.
+The engine MUST verify:
+1. Required files exist.
+2. File modifications remain within permitted boundaries.
+3. No protected files were modified.
+4. Git diffs are available.
+5. Prescribed test commands execute successfully.
+6. Exit codes match expected outcomes.
+7. Acceptance conditions are satisfied through available deterministic checks.
+8. No unauthorized side effects are detected.
+Verification outcomes:
+• PASSED.
+• FAILED.
+• INCOMPLETE.
+• NEEDS_HUMAN_REVIEW.
+A task MUST NOT be marked complete based solely on a successful model response.
+Failed tasks MAY be retried up to a configurable limit.
+Default retry limit: 2.
+Exhausted tasks MUST be escalated to Gemini.
+12. Audit Ledger
+Implement a persistent audit system using SQLite.
+Every tool request MUST generate traceable audit events.
+Record:
+• Unique tool-call ID.
+• Execution run ID.
+• Task ID.
+• Requesting model.
+• Tool name.
+• Normalized arguments.
+• Arguments hash.
+• Authorization decision.
+• Approval reference.
+• Execution status.
+• Execution timestamps.
+• Exit code.
+• Output references.
+• Result hash.
+• Verification outcome.
+The system MUST distinguish between requested arguments and actually executed arguments.
+Audit events MUST be append-only at the application level.
+Implement hash-linked audit records and integrity verification.
+Credentials and secrets MUST be excluded from logs.
+The audit system MUST support reconstructing the complete lifecycle of a tool call.
+13. Git Integration
+Git MUST provide task-level checkpoints.
+Requirements:
+• Inspect repository status before execution.
+• Preserve existing user modifications.
+• Record pre-execution repository state.
+• Validate changed files.
+• Commit successfully verified tasks individually.
+• Associate commit hashes with task IDs.
+• Never automatically push.
+• Require approval for destructive operations.
+• Detect unexpected changes before recovery or rollback.
+14. Context Manager
+Context assembly MUST be task-specific.
+The system MUST avoid repeatedly sending the complete codebase or conversation history.
+Implement:
+• Relevant specification extraction.
+• Source file selection.
+• Dependency-aware context.
+• Previous task summaries.
+• Observation truncation.
+• Context usage estimation.
+• Configurable context limits.
+Default target: 65,536 tokens per slot.
+Mandatory requirements and acceptance criteria MUST never be silently truncated.
+15. Task Scheduler
+Initially implement sequential task execution.
+The scheduler MUST:
+• Construct a directed acyclic graph.
+• Identify ready tasks.
+• Enforce dependencies.
+• Track task states.
+• Detect dependency cycles.
+• Prevent duplicate execution.
+• Support retries.
+• Support blocked task escalation.
+Design the scheduler to support future parallel execution using isolated Git worktrees.
+Parallel execution MUST remain disabled initially.
+16. Persistent State and Recovery
+Use SQLite for execution state.
+Persist:
+• Project information.
+• Execution run information.
+• Task states.
+• Dependencies.
+• Attempt counts.
+• Tool-call references.
+• Approval requests.
+• Verification results.
+• Git commits.
+• Failure information.
+• Recovery checkpoints.
+On restart, reconcile database state with actual repository state.
+The application MUST handle partially completed operations and interrupted processes safely.
+Never blindly rerun an interrupted task.
+17. Gemini Integration and Reporting
+Gemini remains the planning and supervisory agent.
+The harness MUST expose structured reports containing:
+• Overall progress.
+• Completed tasks.
+• Pending tasks.
+• Failed tasks.
+• Blocked tasks.
+• Verification results.
+• Tool execution summaries.
+• Authorization denials.
+• Human approval requests.
+• Git commit references.
+• Outstanding issues.
+• Recommended next actions.
+Use structured JSON and Markdown reports.
+Do not assume undocumented Antigravity APIs exist.
+Support integration through CLI and filesystem-based handover initially.
+18. CLI
+Implement:
+• init
+• validate
+• plan
+• run
+• resume
+• status
+• task
+• retry
+• approve
+• reject
+• report
+• logs
+• verify
+• audit
+The CLI MUST be compatible with Windows PowerShell.
+Provide useful error messages and execution progress.
+19. Initial Release Boundaries
+The initial release MUST deliver a functional end-to-end pipeline.
+Required capabilities:
+1. Discover an existing SpecKit project.
+2. Parse and validate tasks.md.
+3. Build the dependency graph.
+4. Connect to llama.cpp.
+5. Dispatch tasks to FrogNano.
+6. Execute tool calls through the Tool Gateway.
+7. Enforce deterministic authorization.
+8. Support human approval.
+9. Independently verify modifications.
+10. Commit successful tasks.
+11. Maintain an auditable execution history.
+12. Persist execution state.
+13. Recover interrupted sessions.
+14. Generate structured reports for Gemini.
+Do not implement a graphical interface.
+Do not implement distributed execution.
+Do not introduce unnecessary microservices.
+20. Acceptance Criteria
+The product is successful when:
+• A real SpecKit project can be loaded.
+• Tasks are correctly parsed and scheduled.
+• FrogNano can implement a real task.
+• No model-requested tool operation bypasses the gateway.
+• Unauthorized operations are rejected.
+• Approval-required operations pause correctly.
+• Every tool call has a complete audit trail.
+• Actual execution results can be independently verified.
+• Successful tasks receive individual Git commits.
+• Failed tasks do not corrupt completed work.
+• Execution survives application restarts.
+• Gemini can consume execution reports and initiate subsequent work.
+• The complete workflow operates locally on the target Windows laptop.
+21. Architectural Non-Negotiables
+• The Tool Gateway is the exclusive tool execution entry point.
+• The Policy Engine is the sole authorization authority.
+• The Runtime cannot bypass authorization.
+• FrogNano cannot authorize itself.
+• Gemini cannot override global security policy.
+• Verification is independent of model self-reporting.
+• Audit records must distinguish requests, decisions and actual execution.
+• The orchestrator owns workflow state.
+• SQLite is the initial persistence layer.
+• All external integrations must have explicit interfaces.
+The ultimate objective is a locally operated coding system where planning is intelligent, execution is controlled, permissions are enforceable, verification is evidence-based and every operation is traceable.

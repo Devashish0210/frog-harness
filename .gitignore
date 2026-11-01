@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Testing and Type checking caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Frognano Harness local runtime state & database
+.harness/
+
+# Secrets and environment files
+.env
+.env.*
+*.key
+*.pem
+*.cert
+
+# Operating System & Editors
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+.vscode/
+.idea/
