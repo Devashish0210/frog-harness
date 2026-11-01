@@ -107,6 +107,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def get_state_manager(repo_root: Optional[Path] = None) -> StateManager:
+    """Resolve StateManager dynamically using workspace configuration."""
+    config = load_config(repo_root or Path.cwd())
+    return StateManager(config.db_path)
+
+
 def handle_init(args: argparse.Namespace) -> int:
     harness_dir = Path(".harness")
     harness_dir.mkdir(parents=True, exist_ok=True)
@@ -235,7 +241,7 @@ def handle_resume(args: argparse.Namespace) -> int:
 
 
 def handle_status(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     with sm.get_connection() as conn:
         row = conn.execute("SELECT run_id, status, total_tasks, completed_tasks, failed_tasks, blocked_tasks FROM execution_runs ORDER BY started_at DESC LIMIT 1").fetchone()
         if not row:
@@ -265,7 +271,7 @@ def handle_status(args: argparse.Namespace) -> int:
 
 
 def handle_task(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     task = sm.get_task(args.task_id)
     if not task:
         print(f"Error: Task {args.task_id} not found.", file=sys.stderr)
@@ -303,7 +309,7 @@ def handle_task(args: argparse.Namespace) -> int:
 
 
 def handle_retry(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     task = sm.get_task(args.task_id)
     if not task:
         print(f"Error: Task {args.task_id} not found.", file=sys.stderr)
@@ -319,7 +325,7 @@ def handle_retry(args: argparse.Namespace) -> int:
 
 
 def handle_approve(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     mgr = HumanApprovalManager(sm)
     approval = mgr.resolve_approval(args.approval_id, ApprovalStatus.APPROVED, resolved_by="operator")
     if not approval:
@@ -331,7 +337,7 @@ def handle_approve(args: argparse.Namespace) -> int:
 
 
 def handle_reject(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     mgr = HumanApprovalManager(sm)
     approval = mgr.resolve_approval(args.approval_id, ApprovalStatus.REJECTED, resolved_by="operator")
     if not approval:
@@ -343,7 +349,7 @@ def handle_reject(args: argparse.Namespace) -> int:
 
 
 def handle_report(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     git = GitManager()
     output_dir = Path(args.output) if args.output else None
     rep = ReportGenerator(sm, git, reports_dir=output_dir)
@@ -366,7 +372,7 @@ def handle_report(args: argparse.Namespace) -> int:
 
 
 def handle_logs(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     attempts = sm.get_attempts(args.task_id)
     if not attempts:
         print(f"No execution attempts recorded for {args.task_id}.")
@@ -383,7 +389,7 @@ def handle_logs(args: argparse.Namespace) -> int:
 
 
 def handle_verify(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     verif = IndependentVerificationEngine()
 
     if args.all:
@@ -413,7 +419,7 @@ def handle_verify(args: argparse.Namespace) -> int:
 
 
 def handle_audit(args: argparse.Namespace) -> int:
-    sm = StateManager(Path(".harness/state.db"))
+    sm = get_state_manager()
     ledger = AuditLedger(sm)
 
     if args.verify_chain:

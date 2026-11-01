@@ -51,3 +51,44 @@ def test_runtime_adapters_filesystem(workspace: Path) -> None:
     res_s = adapters.search_code("hello", "src")
     assert res_s.exit_code == 0
     assert "src/sample.py" in res_s.stdout
+
+
+def test_tool_gateway_dispatch_enforces_policy_and_blocks_bypass(workspace: Path) -> None:
+    """Verify that dispatch() strictly enforces PolicyEngine and cannot be bypassed."""
+    gateway = ToolGateway(workspace)
+
+    # 1. Deny path traversal
+    res, auth = gateway.dispatch(
+        tool_name="read_file",
+        arguments={"path": "../../escaped.txt"},
+        allowed_files=("src/sample.py",),
+        task_id="T001",
+        attempt_id="att1",
+    )
+    assert res.exit_code == 1
+    assert "POLICY ERROR" in res.stderr
+    assert auth.decision.value == "DENY"
+
+    # 2. Deny file outside allowed_files
+    res2, auth2 = gateway.dispatch(
+        tool_name="write_file",
+        arguments={"path": "src/unauthorized.py", "content": "bad"},
+        allowed_files=("src/sample.py",),
+        task_id="T001",
+        attempt_id="att1",
+    )
+    assert res2.exit_code == 1
+    assert "POLICY ERROR" in res2.stderr
+    assert auth2.decision.value == "DENY"
+
+    # 3. Allow file within allowed_files
+    res3, auth3 = gateway.dispatch(
+        tool_name="write_file",
+        arguments={"path": "src/sample.py", "content": "updated content"},
+        allowed_files=("src/sample.py",),
+        task_id="T001",
+        attempt_id="att1",
+    )
+    assert res3.exit_code == 0
+    assert auth3.decision.value == "ALLOW"
+    assert (workspace / "src" / "sample.py").read_text(encoding="utf-8") == "updated content"

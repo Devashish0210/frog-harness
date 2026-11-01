@@ -60,3 +60,14 @@ def test_policy_require_approval_for_high_risk_commands(workspace: Path) -> None
     decision = pe.evaluate_tool_request("run_command", {"command": "curl", "args": ["http://evil.com"]}, task)
     assert decision.decision == DecisionType.REQUIRE_APPROVAL
     assert decision.risk_level == RiskLevel.HIGH
+
+
+def test_policy_deny_model_git_commit(workspace: Path) -> None:
+    """Constitution Article IX: Model direct commits must be rejected unconditionally."""
+    pe = PolicyEngine(workspace)
+    task = Task("T-001", "Task", "Obj", "Desc")
+
+    decision = pe.evaluate("git_commit", {"message": "unauthorized commit"}, task=task)
+    assert decision.decision == DecisionType.DENY
+    assert decision.policy_rule == "MODEL_GIT_COMMIT_PROHIBITED"
+    assert "prohibited" in decision.reason.lower()

@@ -152,3 +152,29 @@ tests/
 | Model Client | Standard library `urllib.request` | Adheres to stdlib-first rule; eliminates third-party HTTP client dependencies. |
 | Persistence | Local SQLite with WAL mode | Compact, zero-configuration local durability with foreign key guarantees. |
 | Audit Integrity | In-database SHA-256 hash chaining | Delivers cryptographic tamper-evidence without external blockchain or centralized logging infrastructure. |
+
+---
+
+## Architecture Audit & Security Boundary Hardening (Revision v2.1.0)
+
+During the architectural audit, five critical design flaws and bypass vectors were identified and remediated:
+
+1. **Tool Gateway & Policy Engine Encapsulation (Bypass Prevention)**:
+   - *Vulnerability*: Previously, `orchestrator.py` evaluated policy separately before calling `ToolGateway.execute_tool()`. This created a bypass vector where any caller with access to `ToolGateway` could execute arbitrary tools without policy enforcement.
+   - *Remediation*: Refactored `ToolGateway` into an unbypassable security facade. The primary entry point is `ToolGateway.dispatch()`, which internally encapsulates `PolicyEngine`, `HumanApprovalManager`, `AuditLedger`, and `RuntimeAdapters`. Execution is physically impossible without passing through policy evaluation and audit logging.
+
+2. **Constitutional Model Git Commit Prohibition**:
+   - *Vulnerability*: `git_commit` was exposed in `contracts/tools.json` and allowed in `policy_engine.py`, violating Constitution Article IX (Git commits must be created exclusively by the harness verification engine upon verified success, never manually by the model).
+   - *Remediation*: Removed `git_commit` from `contracts/tools.json` and `CORE_TOOL_SCHEMAS`. Added explicit policy rule `MODEL_GIT_COMMIT_PROHIBITED` in `PolicyEngine`, unconditionally returning `DecisionType.DENY`.
+
+3. **Physical Append-Only Immutability in SQLite**:
+   - *Vulnerability*: Relied solely on cryptographic hash chain verification after the fact, allowing direct SQL `UPDATE` or `DELETE` on `audit_events`.
+   - *Remediation*: Added SQLite triggers (`trg_prevent_audit_update` and `trg_prevent_audit_delete`) to abort any `UPDATE` or `DELETE` statement at the database engine level, enforcing defense-in-depth immutability.
+
+4. **Typed Protocol Interfaces**:
+   - *Issue*: `reconcile_and_resume` accepted untyped `git_manager: Any`, and `InferenceClient` could not be swapped without network sockets.
+   - *Remediation*: Authored formal `@runtime_checkable` protocols in `src/frognano_harness/protocols.py`: `GitManagerProtocol`, `InferenceBackendProtocol`, `PolicyEngineProtocol`, `ToolGatewayProtocol`, and `VerificationEngineProtocol`.
+
+5. **Decoupled Configuration Resolution**:
+   - *Issue*: CLI commands hardcoded `Path(".harness/state.db")`, impeding isolated testability.
+   - *Remediation*: Extracted `get_state_manager(repo_root)` in `cli.py` to dynamically resolve DB and configuration paths from workspace context.

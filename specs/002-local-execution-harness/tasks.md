@@ -219,6 +219,18 @@
 
 ---
 
+## Phase 12: Architectural Audit & Security Boundary Hardening
+
+**Purpose**: Remediate security bypass vectors, missing interfaces, untestable paths, and excessive coupling discovered during architectural review.
+
+- [X] T054 [Security] Encapsulate `PolicyEngine`, `HumanApprovalManager`, and `AuditLedger` inside `ToolGateway.dispatch()` in `src/frognano_harness/tool_gateway.py`, preventing bypass of authorization boundaries
+- [X] T055 [Security] Enforce model `git_commit` constitutional prohibition by removing schema from `contracts/tools.json` and returning `DENY` with rule `MODEL_GIT_COMMIT_PROHIBITED` in `src/frognano_harness/policy_engine.py`
+- [X] T056 [Security] Implement physical append-only SQLite triggers on `audit_events` in `contracts/sqlite-schema.sql` and `src/frognano_harness/state_manager.py`
+- [X] T057 [Interfaces] Define typed `@runtime_checkable` protocols (`GitManagerProtocol`, `InferenceBackendProtocol`, `PolicyEngineProtocol`, `ToolGatewayProtocol`, `VerificationEngineProtocol`) in `src/frognano_harness/protocols.py`
+- [X] T058 [Decoupling] Decouple CLI state manager instantiation with dynamic workspace configuration resolution in `src/frognano_harness/cli.py`
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

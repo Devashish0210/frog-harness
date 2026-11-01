@@ -1,11 +1,16 @@
-"""Tool Gateway and Registry: exclusive entry point for model tool execution."""
+"""Tool Gateway and Registry: exclusive, unbypassable entry point for tool execution."""
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Optional
 import uuid
 
+from frognano_harness.approval_manager import HumanApprovalManager
+from frognano_harness.audit_ledger import AuditLedger
 from frognano_harness.exceptions import HarnessError
+from frognano_harness.models import AuthorizationDecision, DecisionType, RiskLevel
+from frognano_harness.policy_engine import PolicyEngine
 from frognano_harness.runtime import RuntimeAdapters, ToolResult
 
 CONTRACTS_TOOLS_JSON = (
@@ -40,19 +45,18 @@ CORE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "directory": {"type": "string", "description": "Relative directory path to inspect.", "default": "."},
                 "recursive": {"type": "boolean", "description": "Whether to list recursively.", "default": False}
             },
-            "required": [],
             "additionalProperties": False
         }
     },
     {
         "name": "search_code",
-        "description": "Search for text or regex patterns across files in the project.",
+        "description": "Search workspace text files for regex query matching.",
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search string or regular expression."},
-                "path": {"type": "string", "description": "Relative directory path to restrict search.", "default": "."},
-                "file_pattern": {"type": "string", "description": "Glob pattern to filter filenames (e.g., '*.py').", "default": "*"}
+                "query": {"type": "string", "description": "Regular expression pattern to find."},
+                "path": {"type": "string", "description": "Directory or file to search within.", "default": "."},
+                "file_pattern": {"type": "string", "description": "Glob file pattern filter.", "default": "*"}
             },
             "required": ["query"],
             "additionalProperties": False
@@ -60,12 +64,12 @@ CORE_TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "write_file",
-        "description": "Write or overwrite content to a pre-declared allowed file path.",
+        "description": "Write or overwrite file contents strictly within allowed_files.",
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Relative path to the file to create or overwrite."},
-                "content": {"type": "string", "description": "The exact full text content to write."},
+                "path": {"type": "string", "description": "Relative path to destination file."},
+                "content": {"type": "string", "description": "Complete file content to write."},
                 "overwrite": {"type": "boolean", "description": "Whether to overwrite existing file.", "default": True}
             },
             "required": ["path", "content"],
@@ -74,12 +78,12 @@ CORE_TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "apply_patch",
-        "description": "Apply a unified diff or targeted block replacement to a file in allowed_files.",
+        "description": "Apply standard unified diff patch to a file strictly within allowed_files.",
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Relative path to the file to modify."},
-                "patch": {"type": "string", "description": "Unified diff or search/replace block patch."}
+                "path": {"type": "string", "description": "Target file relative path to patch."},
+                "patch": {"type": "string", "description": "Unified diff patch string to apply."}
             },
             "required": ["path", "patch"],
             "additionalProperties": False
@@ -87,15 +91,15 @@ CORE_TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "run_command",
-        "description": "Execute a safe allowlisted command using structured process arguments.",
+        "description": "Execute an allowlisted shell/build command within project boundaries.",
         "parameters": {
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "The allowlisted executable binary name (e.g., 'python', 'git')."},
-                "args": {"type": "array", "items": {"type": "string"}, "description": "List of command-line arguments."},
-                "timeout": {"type": "integer", "description": "Execution timeout in seconds.", "default": 120, "maximum": 300}
+                "command": {"type": "string", "description": "Base command executable."},
+                "args": {"type": "array", "items": {"type": "string"}, "description": "Command arguments.", "default": []},
+                "timeout": {"type": "integer", "description": "Timeout in seconds.", "default": 120}
             },
-            "required": ["command", "args"],
+            "required": ["command"],
             "additionalProperties": False
         }
     },
@@ -105,10 +109,9 @@ CORE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "test_command": {"type": "string", "description": "Test runner command (e.g., 'pytest').", "default": "pytest"},
-                "args": {"type": "array", "items": {"type": "string"}, "description": "Optional arguments passed to the test runner.", "default": []}
+                "test_command": {"type": "string", "description": "Test runner command.", "default": "pytest"},
+                "args": {"type": "array", "items": {"type": "string"}, "description": "Test runner arguments.", "default": []}
             },
-            "required": [],
             "additionalProperties": False
         }
     },
@@ -130,19 +133,6 @@ CORE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "cached": {"type": "boolean", "description": "Whether to view staged diffs.", "default": False},
                 "path": {"type": "string", "description": "Optional specific file path to diff."}
             },
-            "additionalProperties": False
-        }
-    },
-    {
-        "name": "git_commit",
-        "description": "Commit staged task changes to Git with task ID association.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "message": {"type": "string", "description": "Commit message referencing task ID."},
-                "files": {"type": "array", "items": {"type": "string"}, "description": "Specific files to stage and commit."}
-            },
-            "required": ["message"],
             "additionalProperties": False
         }
     }
@@ -176,12 +166,25 @@ class ToolRegistry:
 
 
 class ToolGateway:
-    """Exclusive entry point for all model-generated tool calls."""
+    """
+    Exclusive, unbypassable entry point for all model-generated tool calls.
+    Encapsulates PolicyEngine, HumanApprovalManager, AuditLedger, and RuntimeAdapters.
+    """
 
-    def __init__(self, project_root: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        project_root: Optional[Path] = None,
+        policy_engine: Optional[PolicyEngine] = None,
+        approval_manager: Optional[HumanApprovalManager] = None,
+        audit_ledger: Optional[AuditLedger] = None,
+        runtime: Optional[RuntimeAdapters] = None,
+    ) -> None:
         self.project_root = (project_root or Path.cwd()).resolve()
         self.registry = ToolRegistry()
-        self.adapters = RuntimeAdapters(self.project_root)
+        self.policy_engine = policy_engine or PolicyEngine(project_root=self.project_root)
+        self.approval_manager = approval_manager
+        self.audit_ledger = audit_ledger
+        self.adapters = runtime or RuntimeAdapters(self.project_root)
 
     def generate_tool_call_id(self) -> str:
         """Generate unique tool-call identifier."""
@@ -221,8 +224,128 @@ class ToolGateway:
 
         return True, None
 
+    def dispatch(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        allowed_files: tuple[str, ...],
+        task_id: str,
+        attempt_id: str,
+        unattended: bool = False,
+    ) -> tuple[ToolResult, AuthorizationDecision]:
+        """
+        Unified, unbypassable execution pipeline:
+        1. Validates argument schemas.
+        2. Evaluates security and boundary policy.
+        3. Intercepts high-risk operations for approval.
+        4. Executes via sandboxed runtime adapters.
+        5. Logs events to audit ledger.
+        """
+        now = datetime.now(timezone.utc).isoformat()
+
+        # Step 1: Schema validation
+        is_valid, err = self.validate_tool_args(tool_name, arguments)
+        if not is_valid:
+            decision = AuthorizationDecision(
+                decision_id=f"AUTH-{uuid.uuid4().hex[:8].upper()}",
+                tool_call_id="",
+                decision=DecisionType.DENY,
+                risk_level=RiskLevel.HIGH,
+                policy_rule="INVALID_TOOL_ARGUMENTS",
+                reason=err or "Schema validation error",
+                decided_at=now,
+            )
+            return (
+                ToolResult(exit_code=1, stdout="", stderr=f"SCHEMA ERROR: {err}", duration_ms=0),
+                decision,
+            )
+
+        # Step 2: Policy authorization
+        auth = self.policy_engine.evaluate(
+            tool_name=tool_name,
+            arguments=arguments,
+            allowed_files=allowed_files,
+        )
+
+        # Record policy decision in audit ledger if available
+        if self.audit_ledger:
+            self.audit_ledger.record_event(
+                "POLICY_DECISION",
+                {
+                    "task_id": task_id,
+                    "attempt_id": attempt_id,
+                    "tool_name": tool_name,
+                    "decision": auth.decision.value,
+                    "policy_rule": auth.policy_rule,
+                    "reason": auth.reason,
+                },
+            )
+
+        # Step 3: Handle DENY
+        if auth.decision == DecisionType.DENY:
+            return (
+                ToolResult(
+                    exit_code=1,
+                    stdout="",
+                    stderr=f"POLICY ERROR: Operation denied by rule '{auth.policy_rule}': {auth.reason}",
+                    duration_ms=0,
+                ),
+                auth,
+            )
+
+        # Step 4: Handle REQUIRE_APPROVAL
+        if auth.decision == DecisionType.REQUIRE_APPROVAL:
+            if not self.approval_manager:
+                return (
+                    ToolResult(
+                        exit_code=1,
+                        stdout="",
+                        stderr="APPROVAL ERROR: High-risk operation requires human approval, but no approval manager configured",
+                        duration_ms=0,
+                    ),
+                    auth,
+                )
+            tc_id = self.generate_tool_call_id()
+            approval = self.approval_manager.request_approval(
+                tool_call_id=tc_id,
+                task_id=task_id,
+                operation=tool_name,
+                arguments=arguments,
+                risk_level=auth.risk_level,
+                auto_prompt=not unattended,
+            )
+            if approval.status.value != "APPROVED":
+                return (
+                    ToolResult(
+                        exit_code=1,
+                        stdout="",
+                        stderr=f"APPROVAL ERROR: Operation was {approval.status.value}. Execution aborted.",
+                        duration_ms=0,
+                    ),
+                    auth,
+                )
+
+        # Step 5: Execute via sandboxed runtime
+        result = self.execute_tool(tool_name, arguments)
+
+        # Record execution in audit ledger
+        if self.audit_ledger:
+            self.audit_ledger.record_event(
+                "TOOL_EXECUTION",
+                {
+                    "task_id": task_id,
+                    "attempt_id": attempt_id,
+                    "tool_name": tool_name,
+                    "exit_code": result.exit_code,
+                    "duration_ms": result.duration_ms,
+                    "affected_files": list(result.affected_files),
+                },
+            )
+
+        return result, auth
+
     def execute_tool(self, tool_name: str, args: dict[str, Any]) -> ToolResult:
-        """Execute a tool through its sandboxed runtime adapter."""
+        """Execute a tool directly through its sandboxed runtime adapter."""
         is_valid, err = self.validate_tool_args(tool_name, args)
         if not is_valid:
             return ToolResult(
@@ -279,9 +402,12 @@ class ToolGateway:
                 path=args.get("path"),
             )
         elif tool_name == "git_commit":
-            return self.adapters.git_commit(
-                message=args["message"],
-                files=args.get("files"),
+            # Constitution Article IX: Model direct commits prohibited
+            return ToolResult(
+                exit_code=1,
+                stdout="",
+                stderr="Tool 'git_commit' is disabled: model direct commits are constitutionally prohibited",
+                duration_ms=0,
             )
         else:
             return ToolResult(

@@ -195,26 +195,6 @@
         },
         "additionalProperties": false
       }
-    },
-    {
-      "name": "git_commit",
-      "description": "Commit staged task changes to Git with task ID association.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "Commit message referencing task ID."
-          },
-          "files": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Specific files to stage and commit."
-          }
-        },
-        "required": ["message"],
-        "additionalProperties": false
-      }
     }
   ]
 }

@@ -1,5 +1,6 @@
 """Unit tests for AuditLedger."""
 
+import sqlite3
 import tempfile
 from pathlib import Path
 import pytest
@@ -53,8 +54,14 @@ def test_audit_ledger_detects_tampering(temp_db: Path) -> None:
     ledger.record_event("RUN_EVENT", {"action": "start"})
     ledger.record_event("TASK_STATE", {"task": "T-1", "state": "RUNNING"})
 
-    # Tamper with the database row directly
+    # 1. Physical trigger defense: direct update is aborted by SQLite trigger
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        with sm.get_connection() as conn:
+            conn.execute("UPDATE audit_events SET payload_json = '{\"tampered\": true}' WHERE id = 1")
+
+    # 2. Cryptographic defense: if trigger is bypassed, hash chain detects tampering
     with sm.get_connection() as conn:
+        conn.execute("DROP TRIGGER IF EXISTS trg_prevent_audit_update")
         conn.execute("UPDATE audit_events SET payload_json = '{\"tampered\": true}' WHERE id = 1")
 
     is_valid, count, err = ledger.verify_chain()

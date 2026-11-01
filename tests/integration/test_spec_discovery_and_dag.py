@@ -16,13 +16,13 @@ def test_discover_and_parse_real_spec() -> None:
     assert tasks_file.exists()
 
     tasks = parser.parse_tasks_file(tasks_file)
-    assert len(tasks) == 53
+    assert len(tasks) == 58
     assert tasks[0].task_id == "T001"
-    assert tasks[-1].task_id == "T053"
+    assert tasks[-1].task_id == "T058"
 
     scheduler = TaskScheduler(tasks)
     ordered = scheduler.get_execution_order()
-    assert len(ordered) == 53
+    assert len(ordered) == 58
 
     # Check dependencies: T006 cannot run before T001
     ids = [t.task_id for t in ordered]

@@ -51,15 +51,45 @@ class PolicyEngine:
                 return True
         return False
 
+    def evaluate(
+        self,
+        tool_name: str,
+        arguments: Optional[dict[str, Any]] = None,
+        args: Optional[dict[str, Any]] = None,
+        task: Optional[Task] = None,
+        allowed_files: Optional[tuple[str, ...]] = None,
+    ) -> AuthorizationDecision:
+        """Unified entrypoint satisfying PolicyEngineProtocol."""
+        effective_args = arguments if arguments is not None else (args or {})
+        return self.evaluate_tool_request(
+            tool_name=tool_name,
+            args=effective_args,
+            task=task,
+            allowed_files=allowed_files,
+        )
+
     def evaluate_tool_request(
         self,
         tool_name: str,
         args: dict[str, Any],
         task: Optional[Task] = None,
+        allowed_files: Optional[tuple[str, ...]] = None,
     ) -> AuthorizationDecision:
         """Evaluate a tool invocation request against security and scope rules."""
         now = datetime.now(timezone.utc).isoformat()
         decision_id = f"AUTH-{uuid.uuid4().hex[:8].upper()}"
+
+        # 0. Constitutional prohibition: Model Git commit
+        if tool_name == "git_commit":
+            return AuthorizationDecision(
+                decision_id=decision_id,
+                tool_call_id="",
+                decision=DecisionType.DENY,
+                risk_level=RiskLevel.HIGH,
+                policy_rule="MODEL_GIT_COMMIT_PROHIBITED",
+                reason="Model is constitutionally prohibited from executing Git commits directly. Commits are created exclusively by the harness verification engine upon verified success.",
+                decided_at=now,
+            )
 
         # 1. Path-based evaluation
         if tool_name in ("read_file", "write_file", "apply_patch"):
@@ -99,18 +129,30 @@ class PolicyEngine:
                 )
 
             # Check task allowed_files for write/patch operations
-            if tool_name in ("write_file", "apply_patch") and task:
+            if tool_name in ("write_file", "apply_patch"):
+                effective_allowed = allowed_files if allowed_files is not None else (task.allowed_files if task else ())
+                if not effective_allowed:
+                    return AuthorizationDecision(
+                        decision_id=decision_id,
+                        tool_call_id="",
+                        decision=DecisionType.DENY,
+                        risk_level=RiskLevel.HIGH,
+                        policy_rule="TASK_ALLOWED_FILES_EMPTY",
+                        reason=f"Write operation denied: no allowed_files declared for this task boundary",
+                        decided_at=now,
+                    )
+
                 norm_rel = str(target.relative_to(self.project_root)).replace("\\", "/")
-                # Normalize allowed_files
-                allowed_normalized = [f.replace("\\", "/").lstrip("./") for f in task.allowed_files]
+                allowed_normalized = [f.replace("\\", "/").lstrip("./") for f in effective_allowed]
                 if norm_rel not in allowed_normalized:
+                    task_label = f"task {task.task_id}" if task else "current task"
                     return AuthorizationDecision(
                         decision_id=decision_id,
                         tool_call_id="",
                         decision=DecisionType.DENY,
                         risk_level=RiskLevel.MEDIUM,
                         policy_rule="TASK_ALLOWED_FILES",
-                        reason=f"File '{norm_rel}' is not in declared allowed_files for task {task.task_id}",
+                        reason=f"File '{norm_rel}' is not in declared allowed_files for {task_label}",
                         decided_at=now,
                     )
 
@@ -120,7 +162,7 @@ class PolicyEngine:
                     decision=DecisionType.ALLOW,
                     risk_level=RiskLevel.MEDIUM,
                     policy_rule="AUTHORIZED_WRITE",
-                    reason=f"Write operation permitted within allowed_files for {task.task_id}",
+                    reason=f"Write operation permitted within allowed_files",
                     decided_at=now,
                 )
 
@@ -175,8 +217,8 @@ class PolicyEngine:
                 decided_at=now,
             )
 
-        # 4. Testing & Git commit
-        elif tool_name in ("run_tests", "git_commit"):
+        # 4. Testing
+        elif tool_name == "run_tests":
             return AuthorizationDecision(
                 decision_id=decision_id,
                 tool_call_id="",

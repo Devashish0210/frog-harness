@@ -18,6 +18,7 @@ from frognano_harness.models import (
     TaskAttempt,
     TaskStatus,
 )
+from frognano_harness.protocols import GitManagerProtocol
 
 SCHEMA_SQL_PATH = Path(__file__).resolve().parent.parent.parent / "specs" / "002-local-execution-harness" / "contracts" / "sqlite-schema.sql"
 
@@ -176,6 +177,18 @@ CREATE TABLE IF NOT EXISTS audit_events (
 
 CREATE INDEX IF NOT EXISTS idx_audit_entry_hash ON audit_events(entry_hash);
 CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_events(event_type);
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_update
+BEFORE UPDATE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'audit_events is append-only: updates are prohibited');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_delete
+BEFORE DELETE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'audit_events is append-only: deletes are prohibited');
+END;
 """
 
 
@@ -526,7 +539,7 @@ class StateManager:
         attempts = self.get_attempts(task_id)
         return attempts[-1] if attempts else None
 
-    def reconcile_and_resume(self, run_id: str, git_manager: Any) -> ReconciliationResult:
+    def reconcile_and_resume(self, run_id: str, git_manager: GitManagerProtocol) -> ReconciliationResult:
         """
         Reconcile database state with Git commit history upon resumption.
         - Verifies that tasks marked COMPLETED actually have their recorded commit in Git.

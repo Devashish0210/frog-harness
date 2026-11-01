@@ -21,6 +21,7 @@ from frognano_harness.models import (
     TaskStatus,
 )
 from frognano_harness.policy_engine import PolicyEngine
+from frognano_harness.protocols import InferenceBackendProtocol, ToolGatewayProtocol
 from frognano_harness.reporting import ReportGenerator
 from frognano_harness.runtime import RuntimeAdapters
 from frognano_harness.scheduler import TaskScheduler
@@ -32,19 +33,31 @@ from frognano_harness.verification_engine import IndependentVerificationEngine
 class ExecutionOrchestrator:
     """Coordinates scheduling, model dispatch, policy gating, tool execution, and verification."""
 
-    def __init__(self, config: Optional[HarnessConfig] = None, repo_root: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[HarnessConfig] = None,
+        repo_root: Optional[Path] = None,
+        inference_client: Optional[InferenceBackendProtocol] = None,
+        tool_gateway: Optional[ToolGatewayProtocol] = None,
+    ) -> None:
         self.config = config or HarnessConfig()
         self.repo_root = (repo_root or Path.cwd()).resolve()
 
         self.state_manager = StateManager(self.config.db_path)
         self.git_manager = GitManager(self.repo_root)
         self.audit_ledger = AuditLedger(self.state_manager)
-        self.inference_client = InferenceClient(self.config.model_endpoint, self.config.model_alias)
+        self.inference_client = inference_client or InferenceClient(self.config.model_endpoint, self.config.model_alias)
         self.context_manager = ContextManager(self.config.context_token_budget)
         self.policy_engine = PolicyEngine(project_root=self.repo_root)
         self.approval_manager = HumanApprovalManager(self.state_manager)
         self.runtime = RuntimeAdapters(project_root=self.repo_root)
-        self.tool_gateway = ToolGateway(project_root=self.repo_root)
+        self.tool_gateway = tool_gateway or ToolGateway(
+            project_root=self.repo_root,
+            policy_engine=self.policy_engine,
+            approval_manager=self.approval_manager,
+            audit_ledger=self.audit_ledger,
+            runtime=self.runtime,
+        )
         self.verification_engine = IndependentVerificationEngine(project_root=self.repo_root)
         self.reporting = ReportGenerator(self.state_manager, self.git_manager)
 
@@ -155,7 +168,7 @@ class ExecutionOrchestrator:
                     # Model concluded its turn
                     break
 
-                # Process tool calls
+                # Process tool calls strictly through unbypassable ToolGateway facade
                 for tc in tool_calls:
                     tc_id = tc["id"]
                     tool_name = tc["function"]["name"]
@@ -164,49 +177,13 @@ class ExecutionOrchestrator:
                     except Exception:
                         raw_args = {}
 
-                    auth = self.policy_engine.evaluate(
+                    result, auth = self.tool_gateway.dispatch(
                         tool_name=tool_name,
                         arguments=raw_args,
                         allowed_files=task.allowed_files,
-                    )
-
-                    if auth.decision.value == "DENY":
-                        # Denied by policy
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tc_id,
-                                "name": tool_name,
-                                "content": f"POLICY ERROR: Operation denied by rule '{auth.policy_rule}': {auth.reason}",
-                            }
-                        )
-                        continue
-
-                    if auth.decision.value == "REQUIRE_APPROVAL":
-                        # Request human approval
-                        approval = self.approval_manager.request_approval(
-                            tool_call_id=tc_id,
-                            task_id=task.task_id,
-                            operation=tool_name,
-                            arguments=raw_args,
-                            risk_level=auth.risk_level,
-                            auto_prompt=not unattended,
-                        )
-                        if approval.status.value != "APPROVED":
-                            messages.append(
-                                {
-                                    "role": "tool",
-                                    "tool_call_id": tc_id,
-                                    "name": tool_name,
-                                    "content": f"APPROVAL ERROR: Operation was {approval.status.value}. Cannot execute.",
-                                }
-                            )
-                            continue
-
-                    # Execute tool via ToolGateway
-                    result = self.tool_gateway.execute_tool(
-                        tool_name=tool_name,
-                        args=raw_args,
+                        task_id=task.task_id,
+                        attempt_id=attempt_id,
+                        unattended=unattended,
                     )
                     content = result.stdout if result.exit_code == 0 else f"EXIT {result.exit_code}: {result.stderr or result.stdout}"
                     messages.append(

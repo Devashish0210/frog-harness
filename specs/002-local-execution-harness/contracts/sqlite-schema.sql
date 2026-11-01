@@ -167,3 +167,16 @@ CREATE TABLE IF NOT EXISTS audit_events (
 
 CREATE INDEX IF NOT EXISTS idx_audit_entry_hash ON audit_events(entry_hash);
 CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_events(event_type);
+
+-- Triggers enforcing physical append-only immutability
+CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_update
+BEFORE UPDATE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'audit_events is append-only: updates are prohibited');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_delete
+BEFORE DELETE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'audit_events is append-only: deletes are prohibited');
+END;
